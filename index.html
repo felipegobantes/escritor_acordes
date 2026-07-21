@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Escritor">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Escritor de hojas</title>
+<style>
+  :root{
+    --bg:#f8f9fa;
+    --grid-bg:#ffffff;
+    --header:#f1f3f4;
+    --header-ink:#5f6368;
+    --cell-border:#d4d7dc;
+    --ink:#202124;
+    --ink-soft:#5f6368;
+    --active:#1a73e8;
+    --active-bg:#e8f0fe;
+    --chord-ink:#c5221f;
+    --chord-bg:#fce8e6;
+    --section-ink:#7a4f01;
+    --section-bg:#fef7e0;
+    --danger:#c5221f;
+    --mono:'SFMono-Regular',ui-monospace,'Menlo','Consolas',monospace;
+    --ui:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:14px;
+    display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  input,select{font-family:inherit;}
+
+  .toolbar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#fff;
+    border-bottom:1px solid var(--cell-border);flex-wrap:wrap;z-index:5;}
+  .brand{font-weight:700;font-size:16px;letter-spacing:-.2px;}
+  .brand .g{color:var(--chord-ink);}
+  .titlefield{font-size:15px;border:1px solid var(--cell-border);border-radius:7px;
+    padding:7px 10px;min-width:180px;flex:1;max-width:320px;color:var(--ink);background:var(--grid-bg);}
+  .titlefield:focus{outline:none;border-color:var(--active);box-shadow:0 0 0 2px var(--active-bg);}
+  .spacer{flex:1;}
+  .tbtn{padding:8px 14px;border-radius:7px;font-size:13px;font-weight:600;
+    border:1px solid var(--cell-border);background:#fff;color:var(--ink);display:inline-flex;align-items:center;gap:6px;}
+  .tbtn:hover{background:var(--header);}
+  .tbtn.primary{background:var(--active);color:#fff;border-color:transparent;}
+  .tbtn.primary:hover{background:#1765cc;}
+  .tbtn.ghost{background:transparent;border-color:transparent;color:var(--ink-soft);}
+
+  .workspace{flex:1;display:flex;overflow:hidden;position:relative;}
+  .grid-col{flex:1;overflow:auto;padding:18px;}
+
+  .hintbar{font-size:12.5px;color:var(--ink-soft);background:#fff;border:1px solid var(--cell-border);
+    border-radius:8px;padding:9px 12px;margin-bottom:14px;line-height:1.6;max-width:900px;}
+  .hintbar b{color:var(--ink);}
+  .hintbar kbd{font-family:var(--mono);font-size:11px;background:var(--header);border:1px solid var(--cell-border);
+    border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--ink);}
+
+  .sheet-grid{border-collapse:separate;border-spacing:0;background:var(--grid-bg);
+    box-shadow:0 1px 3px rgba(0,0,0,.08);border-radius:4px;}
+  .sheet-grid th,.sheet-grid td{border-right:1px solid var(--cell-border);border-bottom:1px solid var(--cell-border);padding:0;}
+  .sheet-grid th{background:var(--header);color:var(--header-ink);font-weight:600;font-size:11px;
+    height:26px;text-align:center;min-width:58px;border-top:1px solid var(--cell-border);}
+  .corner{position:sticky;left:0;z-index:3;background:var(--header);min-width:132px;border-left:1px solid var(--cell-border);}
+  .colnum{min-width:58px;}
+
+  .rowhead{position:sticky;left:0;z-index:2;background:var(--header);border-left:1px solid var(--cell-border);min-width:132px;}
+  .rowhead-inner{display:flex;align-items:center;gap:4px;padding:3px 4px;}
+  .drag-handle{width:18px;height:28px;display:grid;place-items:center;color:var(--ink-soft);cursor:grab;
+    font-size:13px;border-radius:4px;flex:none;user-select:none;}
+  .drag-handle:hover{background:#e3e6ea;color:var(--ink);}
+  .drag-handle:active{cursor:grabbing;}
+  tr.dragging{opacity:.4;}
+  tr.drop-before td{box-shadow:inset 0 3px 0 var(--active);}
+  tr.drop-after td{box-shadow:inset 0 -3px 0 var(--active);}
+  .rowtype{font-size:11px;font-weight:600;border:1px solid var(--cell-border);border-radius:5px;
+    padding:5px 6px;background:#fff;color:var(--ink);cursor:pointer;flex:1;white-space:nowrap;}
+  .rowtype.chords{color:var(--chord-ink);background:var(--chord-bg);border-color:#f3c2bf;}
+  .rowtype.lyric{color:var(--ink);}
+  .rowtype.section{color:var(--section-ink);background:var(--section-bg);border-color:#f0dca0;}
+  .rowdel{width:22px;height:28px;color:var(--ink-soft);font-size:12px;border-radius:4px;flex:none;}
+  .rowdel:hover{background:var(--chord-bg);color:var(--danger);}
+
+  .cell{min-width:58px;height:34px;position:relative;background:var(--grid-bg);}
+  .cell input{width:100%;height:100%;border:none;background:transparent;text-align:center;
+    font-size:14px;color:var(--ink);padding:2px 4px;}
+  .cell input:focus{outline:none;}
+  .cell.sel{box-shadow:inset 0 0 0 2px var(--active);background:var(--active-bg);z-index:1;}
+  tr.type-chords .cell input{color:var(--chord-ink);font-family:var(--mono);font-weight:700;font-size:13px;}
+  tr.type-chords .cell{background:#fffafa;}
+  tr.type-lyric .cell input{color:var(--ink);}
+  tr.type-section .cell input{color:var(--section-ink);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;text-align:left;padding-left:10px;font-size:13px;}
+  tr.type-section .cell{background:var(--section-bg);}
+  .cell.glue::after{content:'-';position:absolute;right:3px;top:50%;transform:translateY(-50%);
+    color:var(--ink-soft);font-size:13px;opacity:.6;pointer-events:none;font-weight:700;}
+  /* provisional (suggested) syllables from paste */
+  .cell.provisional{background:#f3f6fb;}
+  .cell.provisional input{color:#9aa0a6;font-style:italic;}
+  .cell.provisional.glue::after{opacity:.35;}
+  tr.has-suggestion{position:relative;}
+  .suggest-actions{position:absolute;top:-13px;right:-13px;display:flex;gap:4px;z-index:9;}
+  .suggest-btn{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;font-size:13px;
+    box-shadow:0 2px 6px rgba(0,0,0,.25);border:1px solid var(--cell-border);background:#fff;font-weight:700;}
+  .suggest-btn.ok{background:#e6f4ea;color:var(--ok,#188038);border-color:#b7e0c4;}
+  .suggest-btn.no{background:#fce8e6;color:var(--danger);border-color:#f3c2bf;}
+  .suggest-btn:hover{transform:scale(1.08);}
+
+  .add-row-btns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .addb{font-size:12.5px;padding:8px 13px;border-radius:7px;border:1px dashed var(--cell-border);
+    background:#fff;color:var(--ink-soft);font-weight:600;}
+  .addb:hover{border-color:var(--active);color:var(--active);}
+
+  .drawer-toggle{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:20;
+    background:#12100e;color:#e8c14a;border-radius:9px 0 0 9px;padding:15px 7px;font-size:11px;font-weight:700;
+    writing-mode:vertical-rl;letter-spacing:1.5px;box-shadow:-2px 2px 10px rgba(0,0,0,.2);}
+  .reader-drawer{position:fixed;top:0;right:0;height:100vh;width:min(430px,86vw);background:#12100e;color:#f3ece0;
+    z-index:30;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+    display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(0,0,0,.35);}
+  .reader-drawer.open{transform:none;}
+  .rd-top{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid #2a2620;}
+  .rd-title{flex:1;font-size:14px;font-weight:600;}
+  .rd-close{width:32px;height:32px;border-radius:7px;background:#1c1916;color:#f3ece0;font-size:16px;}
+  .rd-scroll{flex:1;overflow:auto;padding:20px;}
+  .rd-sheet{font-family:var(--mono);font-size:14px;line-height:1.15;}
+  .rd-sheet .sec{color:#c8683a;font-family:var(--ui);font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin:16px 0 6px;}
+  .rd-sheet .sec:first-child{margin-top:0;}
+  .rd-line{margin-bottom:9px;white-space:pre;overflow-x:auto;}
+  .rd-line .c{color:#e8c14a;font-weight:700;min-height:1.15em;}
+  .rd-line .l{color:#f3ece0;}
+  .rd-empty{color:#6b6455;text-align:center;padding:40px 20px;line-height:1.6;font-family:var(--ui);}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#202124;color:#fff;
+    padding:10px 17px;border-radius:8px;font-size:13px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  /* overlay de arrastrar archivo */
+  .drop-overlay{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(26,115,232,.10);backdrop-filter:blur(2px);}
+  .drop-overlay.show{display:flex;}
+  .drop-card{background:#fff;border:2px dashed var(--active);border-radius:16px;padding:34px 46px;
+    text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.18);pointer-events:none;}
+  .drop-card .ic{font-size:38px;margin-bottom:10px;}
+  .drop-card .big{font-size:17px;font-weight:700;color:var(--ink);margin-bottom:5px;}
+  .drop-card .sub{font-size:13px;color:var(--ink-soft);}
+  /* modal guía */
+  .guide-overlay{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.4);padding:20px;}
+  .guide-overlay.show{display:flex;}
+  .guide-card{background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:85vh;overflow:auto;
+    box-shadow:0 12px 40px rgba(0,0,0,.25);padding:24px 26px;}
+  .guide-card h2{margin:0 0 4px;font-size:19px;}
+  .guide-card .lead{color:var(--ink-soft);font-size:13px;margin-bottom:18px;}
+  .guide-card h3{font-size:14px;margin:18px 0 7px;color:var(--active);}
+  .guide-card p,.guide-card li{font-size:13.5px;line-height:1.65;color:var(--ink);}
+  .guide-card ul{margin:6px 0;padding-left:20px;}
+  .guide-card kbd{font-family:var(--mono);font-size:11px;background:var(--header);border:1px solid var(--cell-border);
+    border-bottom-width:2px;border-radius:4px;padding:1px 6px;color:var(--ink);}
+  .guide-close{margin-top:20px;padding:10px 18px;border-radius:8px;background:var(--active);color:#fff;font-weight:600;font-size:14px;}
+  /* filas de atajos: tecla(s) a la izquierda, descripción a la derecha */
+  .key-row{display:flex;align-items:baseline;gap:12px;padding:5px 0;}
+  .key-row .keys{flex:0 0 118px;display:flex;flex-wrap:wrap;gap:4px;}
+  .key-row .desc{flex:1;font-size:13px;color:var(--ink);line-height:1.5;}
+  /* menú contextual */
+  .ctx-menu{position:fixed;z-index:80;background:#fff;border:1px solid var(--cell-border);border-radius:10px;
+    box-shadow:0 8px 28px rgba(0,0,0,.22);padding:6px;min-width:190px;font-size:13px;display:none;}
+  .ctx-menu.show{display:block;}
+  .ctx-group-label{font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--ink-soft);
+    padding:7px 10px 4px;}
+  .ctx-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;color:var(--ink);}
+  .ctx-item:hover{background:var(--active-bg);}
+  .ctx-item .dot{width:8px;height:8px;border-radius:2px;flex:none;}
+  .ctx-item .dot.a{background:var(--chord-ink);} .ctx-item .dot.l{background:var(--ink);} .ctx-item .dot.s{background:var(--section-ink);}
+  .ctx-sep{height:1px;background:var(--cell-border);margin:5px 4px;}
+  .ctx-item.danger{color:var(--danger);}
+  .ctx-item.danger:hover{background:var(--chord-bg);}
+
+  /* ===== TACTIL / MOVIL ===== */
+  .toolbar{padding-top:calc(10px + env(safe-area-inset-top));
+    padding-left:calc(16px + env(safe-area-inset-left));
+    padding-right:calc(16px + env(safe-area-inset-right));}
+  .rowmore{width:26px;height:28px;color:var(--ink-soft);font-size:15px;line-height:1;border-radius:4px;flex:none;}
+  .rowmore:hover{background:#e3e6ea;color:var(--ink);}
+  .lbl-short{display:none;}
+  .tbtn.dirty::after{content:'';width:7px;height:7px;border-radius:50%;background:#fbbc04;
+    box-shadow:0 0 0 2px rgba(255,255,255,.9);}
+  .quickbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:none;gap:6px;
+    background:#fff;border-top:1px solid var(--cell-border);
+    padding:7px calc(8px + env(safe-area-inset-left)) calc(7px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-right));
+    box-shadow:0 -3px 14px rgba(0,0,0,.10);will-change:transform;}
+  .quickbar.show{display:flex;}
+  .qb{flex:1;min-width:0;height:46px;border-radius:9px;border:1px solid var(--cell-border);
+    background:#fff;color:var(--ink);font-size:13px;font-weight:700;line-height:1.15;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;}
+  .qb .sub{font-size:9.5px;font-weight:600;color:var(--ink-soft);letter-spacing:.2px;}
+  .qb:active{background:var(--active-bg);border-color:var(--active);}
+  .qb:disabled{opacity:.35;}
+  .qb.accent{color:var(--chord-ink);}
+
+  @media (pointer:coarse){
+    .cell input,.titlefield{font-size:16px;}       /* <16px hace que iOS haga zoom al enfocar */
+    tr.type-chords .cell input{font-size:16px;}
+    tr.type-section .cell input{font-size:16px;}
+    .cell{height:44px;}
+    .drag-handle,.rowdel{display:none;}            /* el DnD HTML5 no funciona en iOS: se usa el menu */
+    .suggest-btn{width:44px;height:44px;font-size:17px;}
+    .suggest-actions{top:-16px;right:-6px;gap:8px;}
+    .ctx-item{padding:12px 12px;}
+    .rowmore{width:38px;height:38px;font-size:18px;}
+    .tbtn,.addb{min-height:44px;}
+    .rd-close{width:44px;height:44px;}
+    .drawer-toggle{padding:20px 10px;}
+  }
+  @media (max-width:820px){
+    .toolbar{gap:7px;padding-left:calc(10px + env(safe-area-inset-left));padding-right:calc(10px + env(safe-area-inset-right));}
+    .brand{font-size:14px;flex:0 0 auto;}
+    .titlefield{min-width:120px;order:9;flex:1 1 100%;max-width:none;}
+    .spacer{display:none;}
+    .tbtn{padding:8px 11px;font-size:12.5px;}
+    .lbl-full{display:none;} .lbl-short{display:inline;}
+    .rowhead,.corner{min-width:88px;}
+    .rowtype{padding:6px 4px;text-align:center;}
+    .grid-col{padding:12px 12px 150px;}           /* hueco para la barra rapida */
+    .hintbar{display:none;}
+    .reader-drawer{width:100%;}
+    .rd-top{padding-top:calc(15px + env(safe-area-inset-top));}
+    .guide-card{padding:20px 18px;max-height:88vh;}
+    .drawer-toggle{top:auto;bottom:calc(84px + env(safe-area-inset-bottom));transform:none;}
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <span class="brand">Escritor<span class="g">·</span>hojas</span>
+  <input class="titlefield" id="songTitle" placeholder="Título de la canción">
+  <div class="spacer"></div>
+  <button class="tbtn" id="btnUndo" title="Deshacer (Ctrl+Z)">↶<span class="lbl-full"> Deshacer</span></button>
+  <button class="tbtn ghost" id="btnGuide"><span class="lbl-full">GUÍA DE USO</span><span class="lbl-short">?</span></button>
+  <button class="tbtn ghost" id="btnExample">Cargar ejemplo</button>
+  <button class="tbtn ghost" id="btnClear">Limpiar</button>
+  <button class="tbtn" id="btnPasteSheet">Pegar hoja completa</button>
+  <button class="tbtn" id="btnImport">Importar .csv</button>
+  <input type="file" id="fileImport" accept=".csv,text/csv" style="display:none">
+  <button class="tbtn primary" id="btnDownload">Descargar .csv</button>
+</div>
+
+<div class="workspace">
+  <div class="grid-col">
+    <div id="gridWrap"></div>
+    <div class="add-row-btns">
+      <button class="addb" data-add="lyric">＋ Fila de letra</button>
+      <button class="addb" data-add="chords">＋ Fila de acordes</button>
+      <button class="addb" data-add="section">＋ Sección</button>
+    </div>
+  </div>
+</div>
+
+<button class="drawer-toggle" id="drawerToggle">LECTOR ◂</button>
+<div class="reader-drawer" id="drawer">
+  <div class="rd-top"><span class="rd-title" id="rdTitle">Vista previa</span>
+    <button class="rd-close" id="rdClose">›</button></div>
+  <div class="rd-scroll"><div class="rd-sheet" id="rdSheet"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="quickbar" id="quickbar">
+  <button class="qb accent" data-qa="glue">-→<span class="sub">misma palabra</span></button>
+  <button class="qb" data-qa="space">␣→<span class="sub">otra palabra</span></button>
+  <button class="qb" data-qa="enter">↓<span class="sub">fila</span></button>
+  <button class="qb" data-qa="gap">⇤<span class="sub">hueco</span></button>
+  <button class="qb" data-qa="del">⌫<span class="sub">celda</span></button>
+  <button class="qb" data-qa="undo">↶<span class="sub">deshacer</span></button>
+</div>
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-group-label">Insertar arriba</div>
+  <div class="ctx-item" data-pos="above" data-type="chords"><span class="dot a"></span>Acordes</div>
+  <div class="ctx-item" data-pos="above" data-type="lyric"><span class="dot l"></span>Letra</div>
+  <div class="ctx-item" data-pos="above" data-type="section"><span class="dot s"></span>Sección</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-group-label">Insertar abajo</div>
+  <div class="ctx-item" data-pos="below" data-type="chords"><span class="dot a"></span>Acordes</div>
+  <div class="ctx-item" data-pos="below" data-type="lyric"><span class="dot l"></span>Letra</div>
+  <div class="ctx-item" data-pos="below" data-type="section"><span class="dot s"></span>Sección</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="up">↑ Mover arriba</div>
+  <div class="ctx-item" data-action="down">↓ Mover abajo</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" data-action="delete">✕ Eliminar esta fila</div>
+</div>
+<div class="guide-overlay" id="pasteOverlay">
+  <div class="guide-card">
+    <h2>Pegar hoja completa</h2>
+    <div class="lead">Pega una hoja en formato de internet (acordes arriba, letra debajo). Se interpretará y añadirá al final. Es aproximado — revísala después.</div>
+    <textarea id="pasteArea" style="width:100%;height:220px;font-family:var(--mono);font-size:12.5px;border:1px solid var(--cell-border);border-radius:8px;padding:10px;resize:vertical;color:var(--ink);" placeholder="       C           G&#10;Cuando el sol se va a dormir&#10;        Am              F&#10;La ciudad se vuelve gris&#10;[Coro]&#10;C&#10;Yo no se que dar"></textarea>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+      <button class="tbtn ghost" id="pasteCancel">Cancelar</button>
+      <button class="guide-close" id="pasteConfirm" style="margin-top:0;">Interpretar y añadir</button>
+    </div>
+  </div>
+</div>
+
+<div class="guide-overlay" id="guideOverlay">
+  <div class="guide-card">
+    <h2>Guía de uso</h2>
+    <div class="lead">Cada fila tiene a la izquierda un botón para marcar su tipo: Letra, ♪ Acordes o § Sección. Clic derecho sobre una fila para insertar o eliminar.</div>
+
+    <h3>Escribir la letra</h3>
+    <div class="key-row"><div class="keys"><kbd>Tab</kbd></div><div class="desc">Confirma la sílaba con guion (se pega a la siguiente, misma palabra) y avanza.</div></div>
+    <div class="key-row"><div class="keys"><kbd>Espacio</kbd></div><div class="desc">Confirma la sílaba sin guion (empieza otra palabra) y avanza.</div></div>
+    <div class="key-row"><div class="keys">flechas</div><div class="desc">Se mueve entre celdas.</div></div>
+    <div class="key-row"><div class="keys"><kbd>Enter</kbd></div><div class="desc">Baja a la fila siguiente.</div></div>
+
+    <h3>Pegar una frase</h3>
+    <div class="key-row"><div class="keys"><kbd>Enter</kbd> · ✓</div><div class="desc">Acepta la separación en sílabas sugerida.</div></div>
+    <div class="key-row"><div class="keys"><kbd>Esc</kbd> · ✕</div><div class="desc">Descarta la sugerencia.</div></div>
+
+    <h3>Recalzar acordes y deshacer</h3>
+    <div class="key-row"><div class="keys"><kbd>⇧ Tab</kbd></div><div class="desc">Inserta una celda vacía y empuja el resto de la fila a la derecha.</div></div>
+    <div class="key-row"><div class="keys"><kbd>Ctrl ⌫</kbd></div><div class="desc">Elimina la celda actual y trae el resto a la izquierda.</div></div>
+    <div class="key-row"><div class="keys"><kbd>Ctrl Z</kbd></div><div class="desc">Deshace la última acción.</div></div>
+
+    <h3>Poner acordes</h3>
+    <p>En una fila de acordes, escribe el acorde en la columna donde quieres que caiga. El número de columna es la posición: un acorde en la columna 4 caerá sobre la sílaba de la columna 4 de la fila de letra.</p>
+
+    <h3>En iPhone / pantalla táctil</h3>
+    <p>No hacen falta atajos: al tocar una celda aparece abajo una barra con los mismos comandos.</p>
+    <div class="key-row"><div class="keys">-→</div><div class="desc">Confirma la sílaba con guion (misma palabra) y avanza.</div></div>
+    <div class="key-row"><div class="keys">␣→</div><div class="desc">Confirma la sílaba sin guion (otra palabra) y avanza.</div></div>
+    <div class="key-row"><div class="keys">↓</div><div class="desc">Baja a la fila siguiente.</div></div>
+    <div class="key-row"><div class="keys">⇤ · ⌫</div><div class="desc">Inserta un hueco / elimina la celda actual.</div></div>
+    <div class="key-row"><div class="keys">↶</div><div class="desc">Deshace. También está siempre en la barra de arriba.</div></div>
+    <div class="key-row"><div class="keys">⋯</div><div class="desc">A la izquierda de cada fila: insertar, mover arriba/abajo o eliminar.</div></div>
+    <p>La hoja se guarda sola en el dispositivo. El punto amarillo en <b>Descargar .csv</b> avisa cuando hay cambios sin exportar — exporta de vez en cuando, el .csv es el respaldo de verdad.</p>
+
+    <h3>Reordenar y editar</h3>
+    <p>En escritorio, arrastra una fila desde su asa (⠿) para moverla; clic derecho para insertar arriba o abajo. En táctil, usa el botón ⋯ de la fila. Importa un .csv o pega una hoja completa para seguir editándola, y vuelve a exportarla.</p>
+
+    <button class="guide-close" id="guideClose">Entendido</button>
+  </div>
+</div>
+
+<div class="drop-overlay" id="dropOverlay">
+  <div class="drop-card">
+    <div class="ic">📄</div>
+    <div class="big">Suelta el archivo .csv aquí</div>
+    <div class="sub">Se añadirá al final de la hoja actual</div>
+  </div>
+</div>
+
+<script>
+/* ===== SILABADOR ESPAÑOL (validado) ===== */
+const STRONG='aáàeéèoóòAÁÀEÉÈOÓÒ',WEAK='iíìuúùüIÍÌUÚÙÜ',ACC_WEAK='íìúùÍÌÚÙ',VOWELS=STRONG+WEAK;
+const INSEP=['pr','br','tr','dr','cr','gr','fr','pl','bl','cl','gl','fl','ll','rr','ch'];
+const isV=c=>VOWELS.includes(c),isS=c=>STRONG.includes(c),isAW=c=>ACC_WEAK.includes(c);
+function dipt(a,b){if(isS(a)&&isS(b))return false;if(isAW(a)||isAW(b))return false;return true;}
+function silabar(word){
+  if(!word)return[];const ch=[...word],n=ch.length,out=[];let i=0;
+  while(i<n){let syl='';
+    while(i<n&&!isV(ch[i])){syl+=ch[i];i++;}
+    if(i<n&&isV(ch[i])){syl+=ch[i];i++;while(i<n&&isV(ch[i])&&dipt(ch[i-1],ch[i])){syl+=ch[i];i++;}}
+    let cons='',j=i;while(j<n&&!isV(ch[j])){cons+=ch[j];j++;}const more=j<n;
+    if(cons.length===0){out.push(syl);continue;}
+    if(!more){syl+=cons;i+=cons.length;out.push(syl);continue;}
+    if(cons.length===1){out.push(syl);continue;}
+    if(cons.length===2){if(INSEP.includes(cons.toLowerCase())){out.push(syl);}else{syl+=cons[0];i+=1;out.push(syl);}continue;}
+    const last2=cons.slice(-2).toLowerCase();
+    if(INSEP.includes(last2)){syl+=cons.slice(0,-2);i+=cons.length-2;}else{syl+=cons.slice(0,-1);i+=cons.length-1;}
+    out.push(syl);
+  }
+  return out.filter(s=>s!=='');
+}
+function silabarFrase(frase){
+  const words=frase.trim().split(/\s+/).filter(Boolean);const cells=[];
+  words.forEach(w=>{let syls=silabar(w);if(syls.length===0)syls=[w];
+    syls.forEach((s,si)=>{cells.push({text:s,glue:si<syls.length-1});});});
+  return cells;
+}
+
+/* ===== CSV ===== */
+function csvCell(v){v=(v==null)?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function csvRow(cells){return cells.map(csvCell).join(',');}
+
+/* ===== MODELO ===== */
+let grid=[];
+let title='';
+
+/* ===== HISTORIAL (deshacer con Ctrl+Z) ===== */
+const history=[];
+const HISTORY_MAX=100;
+let typingTimer=null;
+/* Guarda una foto del estado actual antes de un cambio. */
+function snapshot(){
+  history.push({ grid: JSON.parse(JSON.stringify(grid)), title });
+  if(history.length>HISTORY_MAX) history.shift();
+}
+/* Para tecleo continuo: agrupa en un solo paso (solo guarda si pasó una pausa). */
+function snapshotTyping(){
+  if(typingTimer){ clearTimeout(typingTimer); }
+  else { snapshot(); } // primer tecleo de la ráfaga -> guarda
+  typingTimer=setTimeout(()=>{ typingTimer=null; }, 600);
+}
+function undo(){
+  if(typingTimer){ clearTimeout(typingTimer); typingTimer=null; }
+  if(history.length===0){ showToast('Nada que deshacer'); return; }
+  const prev=history.pop();
+  grid=prev.grid; title=prev.title;
+  document.getElementById('songTitle').value=title;
+  suggestion=null;
+  render(); updateReader();
+  showToast('Deshecho');
+}
+
+function newRow(type){
+  if(type==='section') return {type,cells:['']};
+  if(type==='chords') return {type,cells:Array(8).fill('')};
+  return {type:'lyric',cells:Array(8).fill(null).map(()=>({text:'',glue:false}))};
+}
+function colsNeeded(){
+  let max=8;
+  grid.forEach(r=>{ if(r.type!=='section') max=Math.max(max,r.cells.length); });
+  return Math.max(max+2,8);
+}
+
+/* Celdas de CONTENIDO (sin marcador de tipo) — usadas por la vista previa. */
+function rowContentCells(r){
+  if(r.type==='section') return ['['+(r.cells[0]||'')+']'];
+  if(r.type==='chords'){
+    let last=-1; r.cells.forEach((c,i)=>{ if((c||'').trim()!=='') last=i; });
+    return r.cells.slice(0,last+1).map(c=>(c||'').trim());
+  }
+  let last=-1; r.cells.forEach((c,i)=>{ if(c && c.text.trim()!=='') last=i; });
+  if(last<0) return [''];
+  const used=r.cells.slice(0,last+1);
+  const out=used.map((c,idx)=>{ const isLast=idx===used.length-1; const t=(c&&c.text)||''; return (c&&c.glue&&!isLast)?t+'-':t; });
+  const hasHyphen=out.some(c=>c.endsWith('-'));
+  if(!hasHyphen) out[out.length-1]=out[out.length-1]+'-';
+  return out;
+}
+/* Celdas para EXPORTAR — anteponen el marcador de tipo entre llaves. */
+function rowToCSVCells(r){
+  const marker = r.type==='section'?'{s}' : r.type==='chords'?'{a}' : '{l}';
+  return [marker, ...rowContentCells(r)];
+}
+function buildCSV(){
+  const rows=[['{t}', title||'Sin título']];
+  grid.forEach(r=>rows.push(rowToCSVCells(r)));
+  return rows.map(csvRow).join('\n');
+}
+
+/* ===== RENDER GRID ===== */
+const gridWrap=document.getElementById('gridWrap');
+let sel={row:0,col:0};
+/* Sugerencia pendiente de pegar: {row, from, to, prev:[celdas originales]} */
+let suggestion=null;
+function isProvisional(ri,c){ return suggestion && suggestion.row===ri && c>=suggestion.from && c<suggestion.to; }
+
+function render(){
+  if(grid.length===0){
+    gridWrap.innerHTML='<div style="border:1px dashed var(--cell-border);border-radius:10px;padding:34px 20px;text-align:center;color:var(--ink-soft);background:#fff;">'
+      +'<div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px;">Hoja en blanco</div>'
+      +'Añade una fila con los botones de abajo, arrastra un archivo .csv, o pulsa <b>Cargar ejemplo</b>.</div>';
+    return;
+  }
+  const cols=colsNeeded();
+  const table=document.createElement('table'); table.className='sheet-grid';
+  const thead=document.createElement('thead'); const htr=document.createElement('tr');
+  const corner=document.createElement('th'); corner.className='corner'; corner.textContent='tipo de fila';
+  htr.appendChild(corner);
+  for(let c=0;c<cols;c++){ const th=document.createElement('th'); th.className='colnum'; th.textContent=(c+1); htr.appendChild(th); }
+  thead.appendChild(htr); table.appendChild(thead);
+  const tbody=document.createElement('tbody');
+  grid.forEach((r,ri)=>{
+    const tr=document.createElement('tr'); tr.className='type-'+r.type;
+    tr.dataset.rowidx=ri;
+    tr.oncontextmenu=(e)=>{ e.preventDefault(); openCtxMenu(e.clientX, e.clientY, ri); };
+    const rh=document.createElement('td'); rh.className='rowhead';
+    const inner=document.createElement('div'); inner.className='rowhead-inner';
+    const handle=document.createElement('span'); handle.className='drag-handle'; handle.textContent='⠿';
+    handle.title='Arrastra para mover la fila'; handle.draggable=true;
+    wireDrag(handle,tr,ri);
+    const sel2=document.createElement('button'); sel2.className='rowtype '+r.type;
+    const _f=r.type==='chords'?'♪ Acordes':r.type==='lyric'?'Letra':'§ Sección';
+    const _s=r.type==='chords'?'♪':r.type==='lyric'?'L':'§';
+    sel2.innerHTML='<span class="lbl-full"></span><span class="lbl-short"></span>';
+    sel2.firstChild.textContent=_f; sel2.lastChild.textContent=_s;
+    sel2.title='Cambiar tipo de fila'; sel2.onclick=()=>cycleType(ri);
+    const del=document.createElement('button'); del.className='rowdel'; del.textContent='✕';
+    del.title='Eliminar fila'; del.onclick=()=>{ snapshot(); grid.splice(ri,1); if(suggestion&&suggestion.row>=ri)suggestion=null; render(); updateReader(); };
+    const more=document.createElement('button'); more.className='rowmore'; more.textContent='⋯';
+    more.title='Opciones de la fila';
+    more.onclick=(ev)=>{ ev.stopPropagation(); const b=more.getBoundingClientRect(); openCtxMenu(b.left,b.bottom+4,ri); };
+    inner.appendChild(handle); inner.appendChild(sel2); inner.appendChild(more); inner.appendChild(del); rh.appendChild(inner); tr.appendChild(rh);
+    if(r.type==='section'){
+      const td=document.createElement('td'); td.className='cell'; td.colSpan=cols;
+      const inp=document.createElement('input'); inp.value=r.cells[0]||''; inp.placeholder='NOMBRE DE SECCIÓN';
+      inp.dataset.row=ri; inp.dataset.col=0;
+      inp.oninput=()=>{ r.cells[0]=inp.value; updateReader(); };
+      inp.onfocus=()=>{ sel={row:ri,col:0}; };
+      td.appendChild(inp); tr.appendChild(td);
+    } else {
+      if(suggestion && suggestion.row===ri) tr.classList.add('has-suggestion');
+      for(let c=0;c<cols;c++){
+        const td=document.createElement('td'); td.className='cell';
+        const isGlue = r.type==='lyric' && r.cells[c] && r.cells[c].glue && (r.cells[c].text!=='');
+        if(isGlue) td.classList.add('glue');
+        if(isProvisional(ri,c)) td.classList.add('provisional');
+        const inp=document.createElement('input');
+        inp.dataset.row=ri; inp.dataset.col=c;
+        inp.value = r.type==='chords' ? (r.cells[c]||'') : ((r.cells[c]&&r.cells[c].text)||'');
+        wireCell(inp,ri,c,r.type);
+        td.appendChild(inp); tr.appendChild(td);
+      }
+    }
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  gridWrap.innerHTML=''; gridWrap.appendChild(table);
+  if(suggestion) placeSuggestActions();
+}
+
+/* Coloca los botones ✓/✕ en la esquina superior derecha de la última celda provisional. */
+function placeSuggestActions(){
+  const lastCol=suggestion.to-1;
+  const anchor=gridWrap.querySelector('input[data-row="'+suggestion.row+'"][data-col="'+lastCol+'"]');
+  if(!anchor) return;
+  const td=anchor.parentElement; // la celda <td>
+  td.style.position='relative';
+  const cont=document.createElement('div'); cont.className='suggest-actions';
+  const ok=document.createElement('button'); ok.className='suggest-btn ok'; ok.textContent='✓'; ok.title='Aceptar (Enter)';
+  ok.onmousedown=(e)=>{ e.preventDefault(); }; ok.onclick=(e)=>{ e.preventDefault(); acceptSuggestion(); };
+  const no=document.createElement('button'); no.className='suggest-btn no'; no.textContent='✕'; no.title='Rechazar (Esc)';
+  no.onmousedown=(e)=>{ e.preventDefault(); }; no.onclick=(e)=>{ e.preventDefault(); rejectSuggestion(); };
+  cont.appendChild(ok); cont.appendChild(no);
+  td.appendChild(cont);
+}
+function acceptSuggestion(){
+  suggestion=null; render(); updateReader(); showToast('Separación aceptada');
+}
+function rejectSuggestion(){
+  if(!suggestion){ return; }
+  const ri=suggestion.row, at=suggestion.from;
+  const r=grid[ri];
+  // restaurar celdas previas
+  if(r) r.cells.splice(at, suggestion.to-at, ...suggestion.prev);
+  suggestion=null;
+  render(); updateReader();
+  if(r) moveTo(ri, at);
+  showToast('Sugerencia descartada');
+}
+
+/* ===== ARRASTRAR FILAS ===== */
+let dragFrom=null;
+function wireDrag(handle,tr,ri){
+  handle.ondragstart=(e)=>{
+    dragFrom=ri; tr.classList.add('dragging');
+    e.dataTransfer.effectAllowed='move';
+    try{ e.dataTransfer.setData('text/plain',String(ri)); }catch(err){}
+    // si hay una sugerencia pendiente, la descartamos para no arrastrar estado a medias
+    if(suggestion) suggestion=null;
+  };
+  handle.ondragend=()=>{ dragFrom=null; clearDropMarks(); tr.classList.remove('dragging'); };
+  // toda la fila acepta el drop
+  tr.ondragover=(e)=>{
+    if(dragFrom===null) return;
+    e.preventDefault(); e.dataTransfer.dropEffect='move';
+    clearDropMarks();
+    const rect=tr.getBoundingClientRect();
+    const after=(e.clientY - rect.top) > rect.height/2;
+    tr.classList.add(after?'drop-after':'drop-before');
+  };
+  tr.ondragleave=()=>{ tr.classList.remove('drop-before','drop-after'); };
+  tr.ondrop=(e)=>{
+    if(dragFrom===null) return;
+    e.preventDefault();
+    const rect=tr.getBoundingClientRect();
+    const after=(e.clientY - rect.top) > rect.height/2;
+    let target=ri + (after?1:0);
+    moveRow(dragFrom,target);
+    dragFrom=null; clearDropMarks();
+  };
+}
+function clearDropMarks(){ gridWrap.querySelectorAll('.drop-before,.drop-after').forEach(el=>el.classList.remove('drop-before','drop-after')); }
+function moveRow(from,to){
+  if(from===to || from===to-1){ render(); return; } // sin cambio real
+  snapshot();
+  const [row]=grid.splice(from,1);
+  if(from<to) to--; // el índice se corre al sacar el elemento
+  grid.splice(to,0,row);
+  suggestion=null;
+  render(); updateReader();
+}
+
+function cycleType(ri){
+  snapshot();
+  const order=['lyric','chords','section'];
+  const r=grid[ri]; const cur=order.indexOf(r.type); const next=order[(cur+1)%order.length];
+  if(next==='section'){ const txt=r.type==='chords'?(r.cells.find(c=>c)||''):((r.cells.find(c=>c&&c.text)||{}).text||''); grid[ri]={type:'section',cells:[txt||'']}; }
+  else if(next==='chords'){ let cells; if(r.type==='lyric') cells=r.cells.map(c=>(c&&c.text)||''); else if(r.type==='section') cells=[r.cells[0]||'']; else cells=r.cells.slice(); while(cells.length<8)cells.push(''); grid[ri]={type:'chords',cells}; }
+  else { let cells; if(r.type==='chords') cells=r.cells.map(t=>({text:t||'',glue:false})); else if(r.type==='section') cells=[{text:r.cells[0]||'',glue:false}]; else cells=r.cells.slice(); while(cells.length<8)cells.push({text:'',glue:false}); grid[ri]={type:'lyric',cells}; }
+  render(); updateReader();
+}
+
+function ensureCol(r,c){
+  if(r.type==='chords'){ while(r.cells.length<=c) r.cells.push(''); }
+  else if(r.type==='lyric'){ while(r.cells.length<=c) r.cells.push({text:'',glue:false}); }
+}
+/* Inserta una celda vacía en la posición c, empujando el resto a la derecha. */
+function insertCellAt(ri,c){
+  const r=grid[ri];
+  if(r.type==='section') return;
+  ensureCol(r,c);
+  if(r.type==='chords') r.cells.splice(c,0,'');
+  else r.cells.splice(c,0,{text:'',glue:false});
+}
+/* Elimina la celda en la posición c, trayendo el resto a la izquierda. */
+function deleteCellAt(ri,c){
+  const r=grid[ri];
+  if(r.type==='section') return;
+  if(c<r.cells.length) r.cells.splice(c,1);
+  // mantener un mínimo de celdas
+  if(r.cells.length===0){ if(r.type==='chords') r.cells.push(''); else r.cells.push({text:'',glue:false}); }
+}
+
+function wireCell(inp,ri,c,type){
+  inp.onfocus=()=>{ sel={row:ri,col:c}; const td=inp.parentElement; if(td) td.classList.add('sel'); };
+  inp.onblur=()=>{ const td=inp.parentElement; if(td) td.classList.remove('sel'); };
+  inp.oninput=()=>{
+    snapshotTyping();
+    const r=grid[ri]; ensureCol(r,c);
+    if(type==='chords') r.cells[c]=inp.value;
+    else { r.cells[c].text=inp.value; refreshGlue(ri,c); }
+    updateReader();
+  };
+  inp.onkeydown=(e)=>{
+    const r=grid[ri];
+    // Ctrl/Cmd+Z -> deshacer (prioridad global)
+    if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z')){ e.preventDefault(); undo(); return; }
+    // Si hay una sugerencia pendiente en esta fila, Enter acepta y Esc descarta (prioridad)
+    if(suggestion && suggestion.row===ri){
+      if(e.key==='Enter'){ e.preventDefault(); acceptSuggestion(); return; }
+      if(e.key==='Escape'){ e.preventDefault(); rejectSuggestion(); return; }
+    }
+    // Ctrl+Tab -> eliminar celda actual, traer todo a la izquierda
+    if(e.key==='Backspace' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); snapshot(); deleteCellAt(ri,c); render(); updateReader(); moveTo(ri,Math.min(c,grid[ri].cells.length-1)); return; }
+    // Shift+Tab -> insertar hueco, empujar la fila a la derecha
+    if(e.key==='Tab' && e.shiftKey){ e.preventDefault(); snapshot(); insertCellAt(ri,c); render(); updateReader(); moveTo(ri,c); return; }
+    if(type==='lyric'){
+      if(e.key==='Tab' && !e.shiftKey){ e.preventDefault(); softAdvance(true); }
+      else if(e.key===' '){ e.preventDefault(); softAdvance(false); }
+      else if(e.key==='Enter'){ e.preventDefault(); moveTo(Math.min(grid.length-1,ri+1),c); }
+      else if(e.key==='ArrowRight' && inp.selectionStart===inp.value.length){ e.preventDefault(); moveTo(ri,c+1); }
+      else if(e.key==='ArrowLeft' && inp.selectionStart===0){ e.preventDefault(); moveTo(ri,Math.max(0,c-1)); }
+      else if(e.key==='ArrowDown'){ e.preventDefault(); moveTo(Math.min(grid.length-1,ri+1),c); }
+      else if(e.key==='ArrowUp'){ e.preventDefault(); moveTo(Math.max(0,ri-1),c); }
+      else if(e.key==='Backspace' && inp.value===''){ e.preventDefault(); snapshot(); if(r.cells[c]) r.cells[c].glue=false; refreshGlue(ri,c); moveTo(ri,Math.max(0,c-1)); }
+    } else {
+      if(e.key==='Tab' && !e.shiftKey){ e.preventDefault(); moveTo(ri,c+1); }
+      else if(e.key==='Enter'){ e.preventDefault(); moveTo(Math.min(grid.length-1,ri+1),c); }
+      else if(e.key==='ArrowRight' && inp.selectionStart===inp.value.length){ e.preventDefault(); moveTo(ri,c+1); }
+      else if(e.key==='ArrowLeft' && inp.selectionStart===0){ e.preventDefault(); moveTo(ri,Math.max(0,c-1)); }
+      else if(e.key==='ArrowDown'){ e.preventDefault(); moveTo(Math.min(grid.length-1,ri+1),c); }
+      else if(e.key==='ArrowUp'){ e.preventDefault(); moveTo(Math.max(0,ri-1),c); }
+    }
+  };
+  inp.onpaste=(e)=>{
+    if(type!=='lyric') return;
+    const text=(e.clipboardData||window.clipboardData).getData('text');
+    if(!text) return;
+    if(/\s/.test(text.trim()) || text.trim().length>2){
+      e.preventDefault();
+      const nuevas=silabarFrase(text);
+      if(nuevas.length){
+        const r=grid[ri];
+        // si ya había una sugerencia pendiente en otra parte, descartarla primero
+        if(suggestion) rejectSuggestion();
+        snapshot();
+        // guardar estado previo de las celdas que vamos a ocupar
+        const from=c, to=c+nuevas.length;
+        for(let cc=from; cc<to; cc++) ensureCol(r,cc);
+        const prev=[]; for(let cc=from; cc<to; cc++){ const cur=r.cells[cc]; prev.push(cur?{text:cur.text,glue:cur.glue}:{text:'',glue:false}); }
+        // aplicar provisionalmente
+        for(let k=0;k<nuevas.length;k++){ r.cells[from+k]={text:nuevas[k].text,glue:nuevas[k].glue}; }
+        suggestion={row:ri, from, to, prev};
+        render(); updateReader();
+        // enfocar la última celda sugerida para que Enter/Esc actúen
+        moveTo(ri,to-1);
+        showToast('Sugerencia: '+nuevas.length+' sílabas — Enter acepta, Esc descarta');
+      }
+    }
+  };
+}
+
+function cellInput(ri,c){ return gridWrap.querySelector('input[data-row="'+ri+'"][data-col="'+c+'"]'); }
+/* Refresca solo el guion visual de una celda, sin reconstruir la tabla. */
+function refreshGlue(ri,c){
+  const r=grid[ri]; if(!r||r.type!=='lyric') return;
+  const inp=cellInput(ri,c); if(!inp||!inp.parentElement) return;
+  const cell=r.cells[c];
+  inp.parentElement.classList.toggle('glue', !!(cell&&cell.glue&&cell.text!==''));
+}
+/* Confirma la silaba y avanza sin reconstruir la tabla: en iOS el teclado
+   se cierra si se destruye el input enfocado. */
+function softAdvance(glue){
+  const ri=sel.row, c=sel.col, r=grid[ri];
+  if(!r||r.type!=='lyric') return;
+  snapshot(); ensureCol(r,c); r.cells[c].glue=glue;
+  refreshGlue(ri,c);
+  const next=cellInput(ri,c+1);
+  if(next){ sel={row:ri,col:c+1}; next.focus(); const L=next.value.length; try{next.setSelectionRange(L,L);}catch(e){} }
+  else { render(); moveTo(ri,c+1); }
+  updateReader();
+}
+function moveTo(ri,c){
+  sel={row:ri,col:c};
+  let inp=gridWrap.querySelector('input[data-row="'+ri+'"][data-col="'+c+'"]');
+  if(!inp){ const tr=gridWrap.querySelectorAll('tbody tr')[ri]; inp=tr?tr.querySelector('input'):null; if(inp){sel.col=parseInt(inp.dataset.col)||0;} }
+  if(inp){ inp.focus(); const L=inp.value.length; try{inp.setSelectionRange(L,L);}catch(e){} }
+}
+
+/* ===== MENÚ CONTEXTUAL (clic derecho en fila) ===== */
+const ctxMenu=document.getElementById('ctxMenu');
+let ctxRow=null;
+function openCtxMenu(x,y,ri){
+  ctxRow=ri;
+  ctxMenu.classList.add('show');
+  // posicionar sin salirse de la pantalla
+  const mw=ctxMenu.offsetWidth||200, mh=ctxMenu.offsetHeight||260;
+  let px=x, py=y;
+  if(px+mw>window.innerWidth-8) px=window.innerWidth-mw-8;
+  if(py+mh>window.innerHeight-8) py=window.innerHeight-mh-8;
+  ctxMenu.style.left=px+'px'; ctxMenu.style.top=py+'px';
+}
+function closeCtxMenu(){ ctxMenu.classList.remove('show'); ctxRow=null; }
+ctxMenu.querySelectorAll('.ctx-item').forEach(item=>{
+  item.onclick=()=>{
+    if(ctxRow==null){ closeCtxMenu(); return; }
+    const action=item.dataset.action;
+    if(action==='up'||action==='down'){
+      if(action==='up'&&ctxRow===0){ closeCtxMenu(); return; }
+      if(action==='down'&&ctxRow>=grid.length-1){ closeCtxMenu(); return; }
+      moveRow(ctxRow, action==='up'?ctxRow-1:ctxRow+2);
+      closeCtxMenu(); return;
+    }
+    if(action==='delete'){
+      snapshot(); grid.splice(ctxRow,1); if(suggestion&&suggestion.row>=ctxRow)suggestion=null;
+      render(); updateReader(); closeCtxMenu(); return;
+    }
+    const pos=item.dataset.pos, type=item.dataset.type;
+    const at = pos==='above' ? ctxRow : ctxRow+1;
+    snapshot();
+    grid.splice(at,0,newRow(type));
+    if(suggestion && suggestion.row>=at) suggestion.row++;
+    render(); updateReader(); closeCtxMenu();
+    setTimeout(()=>moveTo(at,0),0);
+  };
+});
+// cerrar el menú al hacer clic fuera o con Escape
+document.addEventListener('click',(e)=>{ if(ctxMenu.classList.contains('show') && !ctxMenu.contains(e.target)) closeCtxMenu(); });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && ctxMenu.classList.contains('show')) closeCtxMenu(); });
+window.addEventListener('scroll',()=>{ if(ctxMenu.classList.contains('show')) closeCtxMenu(); }, true);
+
+/* ===== AÑADIR FILAS ===== */
+document.querySelectorAll('[data-add]').forEach(b=>{
+  b.onclick=()=>{
+    snapshot();
+    const nr=newRow(b.dataset.add);
+    // insertar después de la fila seleccionada, si hay una válida; si no, al final
+    let at=grid.length;
+    if(sel && sel.row!=null && sel.row>=0 && sel.row<grid.length) at=sel.row+1;
+    grid.splice(at,0,nr);
+    if(suggestion && suggestion.row>=at) suggestion.row++;
+    render(); updateReader();
+    setTimeout(()=>moveTo(at,0),0);
+  };
+});
+
+/* ===== LECTOR (preview) ===== */
+const drawer=document.getElementById('drawer');
+document.getElementById('drawerToggle').onclick=()=>{ drawer.classList.add('open'); updateReader(); };
+document.getElementById('rdClose').onclick=()=>drawer.classList.remove('open');
+
+function parseLyricCells(csvCells){
+  const syl=[]; for(let i=0;i<csvCells.length;i++){ let t=csvCells[i]; const isLast=i===csvCells.length-1; let glue=false; if(t.endsWith('-')){t=t.slice(0,-1);glue=!isLast;} syl.push({text:t,glue}); } return syl;
+}
+function renderPairPreview(chordMap,syls){
+  let lyric='',startCol=[]; syls.forEach((s,idx)=>{startCol[idx]=lyric.length;lyric+=s.text;if(!s.glue&&idx!==syls.length-1)lyric+=' ';});
+  const overflow=[];let chordLine='';
+  Object.keys(chordMap).map(Number).sort((a,b)=>a-b).forEach(p=>{const chord=chordMap[p];
+    if(p<syls.length){const col=startCol[p];if(chordLine.length<col)chordLine+=' '.repeat(col-chordLine.length);if(chordLine.length>col&&chordLine.length>0)chordLine+=' ';chordLine+=chord;}else overflow.push(chord);});
+  if(overflow.length){const pad=lyric.length+2;if(chordLine.length<pad)chordLine+=' '.repeat(pad-chordLine.length);chordLine+=overflow.join(' ');}
+  return {chord:chordLine,lyric};
+}
+function updateReader(){
+  document.getElementById('rdTitle').textContent=title||'Vista previa';
+  const sheet=document.getElementById('rdSheet');
+  if(grid.length===0){ sheet.innerHTML='<div class="rd-empty">Aún no hay filas.<br>Añade una para empezar.</div>'; return; }
+  const rows=grid.map(rowContentCells);
+  const types=grid.map(r=>r.type);
+  sheet.innerHTML='';
+  let i=0;
+  while(i<grid.length){
+    const t=types[i];
+    if(t==='section'){ const d=document.createElement('div'); d.className='sec'; const nm=(grid[i].cells[0]||'').trim(); d.textContent=nm?'['+nm+']':'—'; sheet.appendChild(d); i++; continue; }
+    if(t==='chords'){
+      if(types[i+1]==='lyric'){
+        const chordMap={}; rows[i].forEach((c,idx)=>{ if((c||'').trim()!=='') chordMap[idx]=c.trim(); });
+        const syls=parseLyricCells(rows[i+1]);
+        const r=renderPairPreview(chordMap,syls);
+        appendLine(sheet,r.chord,r.lyric); i+=2; continue;
+      } else {
+        let chordLine=''; rows[i].forEach((c,idx)=>{ if((c||'').trim()!==''){ if(chordLine.length<idx)chordLine+=' '.repeat(idx-chordLine.length); if(chordLine.length>idx&&chordLine.length>0)chordLine+=' '; chordLine+=c.trim(); } });
+        appendLine(sheet,chordLine,null); i++; continue;
+      }
+    }
+    if(t==='lyric'){ const syls=parseLyricCells(rows[i]); const r=renderPairPreview({},syls); appendLine(sheet,r.chord,r.lyric); i++; continue; }
+    i++;
+  }
+}
+function appendLine(sheet,chord,lyric){
+  const line=document.createElement('div'); line.className='rd-line';
+  const c=document.createElement('div'); c.className='c'; c.textContent=chord||' '; line.appendChild(c);
+  if(lyric!==null){ const l=document.createElement('div'); l.className='l'; l.textContent=lyric||' '; line.appendChild(l); }
+  sheet.appendChild(line);
+}
+
+/* ===== IMPORTAR CSV (formato nuevo con marcador {t}/{s}/{a}/{l}) ===== */
+/* Parser CSV completo RFC4180 (lectura). */
+function parseCSVFull(text){
+  const rows=[]; let row=[]; let cell=''; let i=0; let q=false;
+  text=text.replace(/\r\n?/g,'\n');
+  while(i<text.length){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){cell+='"';i+=2;continue;} q=false;i++;continue; } cell+=ch;i++;continue; }
+    else{ if(ch==='"'){q=true;i++;continue;} if(ch===','){row.push(cell);cell='';i++;continue;} if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell='';i++;continue;} cell+=ch;i++;continue; }
+  }
+  row.push(cell); rows.push(row);
+  return rows;
+}
+/* Convierte celdas de letra del CSV a {text,glue}, descartando guion de seguridad. */
+function importLyricCells(cells){
+  const out=[];
+  for(let i=0;i<cells.length;i++){
+    let t=cells[i]; const isLast=i===cells.length-1; let glue=false;
+    if(t.endsWith('-')){ t=t.slice(0,-1); glue=!isLast; } // guion final en última celda = seguridad -> se descarta (glue queda false)
+    out.push({text:t,glue});
+  }
+  return out;
+}
+function importCSVText(text){
+  const rows=parseCSVFull(text);
+  let importedTitle=null;
+  const newRows=[];
+  for(const cells of rows){
+    if(cells.length===0) continue;
+    const marker=(cells[0]||'').trim().toLowerCase();
+    const rest=cells.slice(1);
+    if(marker==='{t}'){
+      importedTitle=(rest[0]||'').trim();
+      // (las tags rest[1..] entre paréntesis se ignoran aquí; el escritor no gestiona tags)
+    } else if(marker==='{s}'){
+      const raw=(rest[0]||'').trim();
+      const label=raw.replace(/^\[/,'').replace(/\]$/,'').trim();
+      newRows.push({type:'section',cells:[label]});
+    } else if(marker==='{a}'){
+      const cellsArr=rest.map(c=>(c||'').trim());
+      while(cellsArr.length<8) cellsArr.push('');
+      newRows.push({type:'chords',cells:cellsArr});
+    } else if(marker==='{l}'){
+      let syl=importLyricCells(rest);
+      while(syl.length<8) syl.push({text:'',glue:false});
+      newRows.push({type:'lyric',cells:syl});
+    }
+    // filas sin marcador reconocido se ignoran (formato viejo no soportado por decisión)
+  }
+  return {importedTitle,newRows};
+}
+/* ===== PEGAR HOJA COMPLETA (formato internet: acordes arriba, letra abajo) ===== */
+const ROOT_EN='[A-G](?:#|b)?';
+const ROOT_ES='(?:Do|Re|Mi|Fa|Sol|La|Si)(?:#|b)?';
+const SUFFIX='(?:m|maj|min|dim|aug|sus|add|M|\\+|\u00b0)?[0-9]*(?:(?:b|#)[0-9]+|sus[0-9]*|add[0-9]+|maj[0-9]+)*';
+const BASS='(?:\\/(?:'+ROOT_EN+'|'+ROOT_ES+'))?';
+const CHORD_EN=new RegExp('^'+ROOT_EN+SUFFIX+BASS+'$');
+const CHORD_ES=new RegExp('^'+ROOT_ES+SUFFIX+BASS+'$');
+/* Do/Re/Mi/Fa/Sol/La/Si tambien son palabras en espanol: solo cuentan como acorde
+   si llevan alteracion, sufijo o bajo (Mi7, La#, Sol/Si), nunca sueltas. */
+function isChordToken(t, allowBareES){
+  if(CHORD_EN.test(t)) return true;
+  if(!CHORD_ES.test(t)) return false;
+  if(allowBareES) return true;
+  return !/^(?:Do|Re|Mi|Fa|Sol|La|Si)$/.test(t);
+}
+function isChordLineTxt(line){
+  const tokens=line.trim().split(/\s+/).filter(Boolean);
+  if(tokens.length===0) return false;
+  // primera pasada estricta: las notas latinas sueltas no cuentan
+  const strict=tokens.filter(t=>isChordToken(t,false)).length;
+  if(strict/tokens.length >= 0.6) return true;
+  // segunda pasada: si TODOS los tokens son acordes validos (incl. notas latinas
+  // sueltas) y hay separacion amplia, tambien es una linea de acordes
+  const loose=tokens.filter(t=>isChordToken(t,true)).length;
+  return loose===tokens.length && /\s{2,}/.test(line.trim());
+}
+function isSectionLineTxt(line){
+  const t=line.trim();
+  if(/^\[.*\]$/.test(t)) return true;
+  if(/^(intro|estrofa|coro|puente|verso|estribillo|solo|final|outro|pre-?coro|interludio|bridge|chorus|verse)\b[:\s]*$/i.test(t)) return true;
+  return false;
+}
+function sectionLabelTxt(line){ return line.trim().replace(/^\[/,'').replace(/\]$/,'').replace(/:$/,'').trim().toUpperCase(); }
+function extractChordsTxt(line){
+  const chords=[]; const re=/\S+/g; let m;
+  while((m=re.exec(line))!==null){ if(isChordToken(m[0],true)) chords.push({chord:m[0], col:m.index}); }
+  return chords;
+}
+function lyricSylsWithCols(line){
+  const result=[]; const re=/\S+/g; let m;
+  while((m=re.exec(line))!==null){
+    const word=m[0], startCol=m.index;
+    const clean=word.replace(/[^0-9A-Za-zàáéíóúüñÁÉÍÓÚÜÑ]/g,'');
+    const syls=silabar(clean);
+    if(syls.length===0){ result.push({text:word,glue:false,col:startCol}); continue; }
+    let acc=startCol;
+    syls.forEach((s,idx)=>{ result.push({text:s, glue: idx<syls.length-1, col:acc}); acc+=s.length; });
+  }
+  return result;
+}
+function alignChordsTxt(chords, syls){
+  const chordMap={}; const overflow=[];
+  chords.forEach(({chord,col})=>{
+    if(syls.length===0){ overflow.push(chord); return; }
+    let best=0,bestDist=Infinity;
+    for(let i=0;i<syls.length;i++){ const d=Math.abs(syls[i].col-col); if(d<bestDist){bestDist=d;best=i;} }
+    const lastSyl=syls[syls.length-1];
+    if(col > lastSyl.col + lastSyl.text.length + 1){ overflow.push(chord); }
+    else if(chordMap[best]!==undefined){ if(best+1<syls.length && chordMap[best+1]===undefined) chordMap[best+1]=chord; else overflow.push(chord); }
+    else chordMap[best]=chord;
+  });
+  return {chordMap, overflow};
+}
+/* Convierte el bloque de texto en filas del grid. */
+function blockToGridRows(text){
+  const lines=text.replace(/\r\n?/g,'\n').split('\n');
+  const out=[]; let i=0;
+  while(i<lines.length){
+    const line=lines[i];
+    if(line.trim()===''){ i++; continue; }
+    if(isSectionLineTxt(line)){ out.push({type:'section',cells:[sectionLabelTxt(line)]}); i++; continue; }
+    if(isChordLineTxt(line)){
+      const chords=extractChordsTxt(line);
+      const next=lines[i+1];
+      if(next!==undefined && next.trim()!=='' && !isChordLineTxt(next) && !isSectionLineTxt(next)){
+        const syls=lyricSylsWithCols(next);
+        const {chordMap,overflow}=alignChordsTxt(chords,syls);
+        // fila de acordes: por índice de sílaba
+        let maxIdx=-1; Object.keys(chordMap).forEach(k=>maxIdx=Math.max(maxIdx,+k));
+        const chordCells=[]; for(let k=0;k<=maxIdx;k++) chordCells.push(chordMap[k]||'');
+        // añadir overflow al final de la fila de acordes
+        overflow.forEach(ch=>chordCells.push(ch));
+        while(chordCells.length<8) chordCells.push('');
+        out.push({type:'chords',cells:chordCells});
+        // fila de letra
+        const lyrCells=syls.map(s=>({text:s.text,glue:s.glue}));
+        while(lyrCells.length<8) lyrCells.push({text:'',glue:false});
+        out.push({type:'lyric',cells:lyrCells});
+        i+=2; continue;
+      } else {
+        // solo acordes por posición de columna aproximada (índice secuencial)
+        const chordCells=[]; chords.forEach(c=>chordCells.push(c.chord));
+        while(chordCells.length<8) chordCells.push('');
+        out.push({type:'chords',cells:chordCells});
+        i++; continue;
+      }
+    }
+    // línea de letra sin acordes
+    const syls=lyricSylsWithCols(line);
+    const lyrCells=syls.map(s=>({text:s.text,glue:s.glue}));
+    while(lyrCells.length<8) lyrCells.push({text:'',glue:false});
+    out.push({type:'lyric',cells:lyrCells});
+    i++;
+  }
+  return out;
+}
+const pasteOverlay=document.getElementById('pasteOverlay');
+document.getElementById('btnPasteSheet').onclick=()=>{ document.getElementById('pasteArea').value=''; pasteOverlay.classList.add('show'); setTimeout(()=>document.getElementById('pasteArea').focus(),50); };
+document.getElementById('pasteCancel').onclick=()=>pasteOverlay.classList.remove('show');
+pasteOverlay.onclick=(e)=>{ if(e.target===pasteOverlay) pasteOverlay.classList.remove('show'); };
+document.getElementById('pasteConfirm').onclick=()=>{
+  const text=document.getElementById('pasteArea').value;
+  if(!text.trim()){ showToast('Pega algo primero'); return; }
+  const newRows=blockToGridRows(text);
+  if(newRows.length===0){ showToast('No se pudo interpretar el texto'); return; }
+  snapshot();
+  grid=grid.concat(newRows);
+  suggestion=null; render(); updateReader();
+  pasteOverlay.classList.remove('show');
+  showToast('Interpretadas '+newRows.length+' filas — revísalas');
+};
+
+/* ===== ACCIONES ===== */
+document.getElementById('btnImport').onclick=()=>document.getElementById('fileImport').click();
+async function processImportFile(f){
+  if(!f) return;
+  if(!/\.csv$/i.test(f.name) && f.type && !/csv|text/.test(f.type)){ showToast('Solo archivos .csv'); return; }
+  const text=await f.text();
+  const {importedTitle,newRows}=importCSVText(text);
+  if(newRows.length===0 && importedTitle===null){ showToast('No se reconoció formato con marcador {t}/{s}/{a}/{l}'); return; }
+  snapshot();
+  grid=grid.concat(newRows);
+  if(importedTitle && !title){ title=importedTitle; document.getElementById('songTitle').value=title; }
+  suggestion=null;
+  render(); updateReader();
+  showToast('Importadas '+newRows.length+' filas');
+}
+document.getElementById('fileImport').onchange=async(e)=>{
+  await processImportFile(e.target.files[0]);
+  e.target.value=''; // permite reimportar el mismo archivo
+};
+/* Arrastrar y soltar un archivo sobre la ventana */
+(function(){
+  const overlay=document.getElementById('dropOverlay');
+  let depth=0; // contador para dragenter/dragleave anidados
+  window.addEventListener('dragenter',(e)=>{
+    if(e.dataTransfer && Array.from(e.dataTransfer.types||[]).includes('Files')){ e.preventDefault(); depth++; overlay.classList.add('show'); }
+  });
+  window.addEventListener('dragover',(e)=>{
+    if(e.dataTransfer && Array.from(e.dataTransfer.types||[]).includes('Files')){ e.preventDefault(); e.dataTransfer.dropEffect='copy'; }
+  });
+  window.addEventListener('dragleave',(e)=>{
+    if(e.dataTransfer && Array.from(e.dataTransfer.types||[]).includes('Files')){ depth=Math.max(0,depth-1); if(depth===0) overlay.classList.remove('show'); }
+  });
+  window.addEventListener('drop',async(e)=>{
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+      e.preventDefault(); depth=0; overlay.classList.remove('show');
+      await processImportFile(e.dataTransfer.files[0]);
+    }
+  });
+})();
+document.getElementById('songTitle').oninput=(e)=>{ title=e.target.value; updateReader(); };
+document.getElementById('btnDownload').onclick=()=>{
+  if(grid.length===0){ showToast('La hoja está vacía'); return; }
+  const csv=buildCSV(); const name=(title||'hoja').replace(/[\\/:*?"<>|]+/g,'_').trim()||'hoja';
+  saveNow(); clearDirty();   // el contenido ya está a salvo aunque falle la descarga
+  try{
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=name+'.csv'; a.rel='noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    showToast('Descargado '+name+'.csv');
+  }catch(err){ showToast('No se pudo descargar en este navegador'); }
+};
+document.getElementById('btnClear').onclick=()=>{ if(grid.length && !confirm('¿Borrar todo?'))return; if(grid.length||title) snapshot(); suggestion=null; grid=[]; try{localStorage.removeItem(SAVE_KEY);}catch(e){} title=''; document.getElementById('songTitle').value=''; render(); updateReader(); };
+
+let toastT; function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ===== EJEMPLO (bajo demanda) ===== */
+function loadExample(){
+  snapshot();
+  title='Cuando el sol';
+  document.getElementById('songTitle').value=title;
+  grid=[
+    {type:'section',cells:['ESTROFA']},
+    {type:'chords',cells:['C','','','G','','','','']},
+    {type:'lyric',cells:[{text:'Cuan',glue:true},{text:'do',glue:false},{text:'el',glue:false},{text:'sol',glue:false},{text:'se',glue:false},{text:'va',glue:false},{text:'',glue:false},{text:'',glue:false}]}
+  ];
+  suggestion=null;
+  render(); updateReader();
+}
+document.getElementById('btnExample').onclick=loadExample;
+const guideOverlay=document.getElementById('guideOverlay');
+document.getElementById('btnGuide').onclick=()=>guideOverlay.classList.add('show');
+document.getElementById('guideClose').onclick=()=>guideOverlay.classList.remove('show');
+guideOverlay.onclick=(e)=>{ if(e.target===guideOverlay) guideOverlay.classList.remove('show'); };
+
+/* Ctrl/Cmd+Z global (cuando el foco no está en una celda) */
+document.addEventListener('keydown',(e)=>{
+  if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z')){
+    const tag=(e.target.tagName||'').toLowerCase();
+    const inGrid = e.target.closest && e.target.closest('#gridWrap');
+    // si está en una celda del grid, ya lo maneja el onkeydown de la celda
+    if(inGrid) return;
+    // evitar interferir con deshacer nativo del título/textarea
+    if(tag==='textarea') return;
+    e.preventDefault(); undo();
+  }
+});
+
+document.getElementById('btnUndo').onclick=()=>undo();
+
+/* ===== GUARDADO AUTOMATICO =====
+   localStorage: instalada en pantalla de inicio con display:standalone, el
+   contenido queda exento de la purga de 7 dias de WebKit. Aun asi el .csv
+   sigue siendo el respaldo real: el punto amarillo avisa si hay cambios
+   sin exportar. */
+const SAVE_KEY='escritor.hoja.v1';
+let saveT=null, booted=false;
+function saveNow(){
+  try{
+    if(grid.length===0 && !title){ localStorage.removeItem(SAVE_KEY); return; }
+    localStorage.setItem(SAVE_KEY, JSON.stringify({v:1,title,grid,ts:Date.now()}));
+  }catch(e){}
+}
+function scheduleSave(){ clearTimeout(saveT); saveT=setTimeout(saveNow,400); }
+function markDirty(){ if(grid.length) document.getElementById('btnDownload').classList.add('dirty'); }
+function clearDirty(){ document.getElementById('btnDownload').classList.remove('dirty'); }
+function restoreSaved(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY); if(!raw) return false;
+    const d=JSON.parse(raw);
+    if(!d||!Array.isArray(d.grid)||d.grid.length===0) return false;
+    // validacion minima para no cargar basura
+    for(const r of d.grid){ if(!r||!r.type||!Array.isArray(r.cells)) return false; }
+    grid=d.grid; title=d.title||'';
+    document.getElementById('songTitle').value=title;
+    return true;
+  }catch(e){ return false; }
+}
+const _updateReader=updateReader;
+updateReader=function(){ _updateReader(); if(booted){ scheduleSave(); markDirty(); } };
+window.addEventListener('pagehide',saveNow);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') saveNow(); });
+
+/* ===== BARRA RAPIDA (encima del teclado en movil) ===== */
+const quickbar=document.getElementById('quickbar');
+let qbHideT=null;
+function isGridInput(el){ return !!(el && el.tagName==='INPUT' && el.closest && el.closest('#gridWrap')); }
+function syncQuickbar(){
+  const r=grid[sel.row];
+  const lyric=!!(r&&r.type==='lyric');
+  const notSection=!!(r&&r.type!=='section');
+  quickbar.querySelector('[data-qa="glue"]').disabled=!lyric;
+  quickbar.querySelector('[data-qa="space"]').disabled=!lyric;
+  quickbar.querySelector('[data-qa="gap"]').disabled=!notSection;
+  quickbar.querySelector('[data-qa="del"]').disabled=!notSection;
+}
+document.addEventListener('focusin',(e)=>{
+  if(isGridInput(e.target)){ clearTimeout(qbHideT); quickbar.classList.add('show'); syncQuickbar(); placeQuickbar(); }
+});
+document.addEventListener('focusout',(e)=>{
+  if(isGridInput(e.target)){
+    qbHideT=setTimeout(()=>{ if(!isGridInput(document.activeElement)) quickbar.classList.remove('show'); },200);
+  }
+});
+quickbar.querySelectorAll('.qb').forEach(b=>{
+  // sin preventDefault el input pierde el foco y iOS cierra el teclado
+  b.addEventListener('pointerdown',(e)=>e.preventDefault());
+  b.addEventListener('mousedown',(e)=>e.preventDefault());
+  b.onclick=()=>{
+    const a=b.dataset.qa, ri=sel.row, c=sel.col, r=grid[ri];
+    if(a==='glue') softAdvance(true);
+    else if(a==='space') softAdvance(false);
+    else if(a==='enter') moveTo(Math.min(grid.length-1,ri+1),c);
+    else if(a==='gap'){ if(!r||r.type==='section')return; snapshot(); insertCellAt(ri,c); render(); updateReader(); moveTo(ri,c); }
+    else if(a==='del'){ if(!r||r.type==='section')return; snapshot(); deleteCellAt(ri,c); render(); updateReader(); moveTo(ri,Math.min(c,grid[ri].cells.length-1)); }
+    else if(a==='undo') undo();
+    syncQuickbar();
+  };
+});
+/* El teclado de iOS tapa los elementos fixed: se reposiciona con visualViewport. */
+function placeQuickbar(){
+  const vv=window.visualViewport; if(!vv) return;
+  const gap=Math.max(0, window.innerHeight-(vv.height+vv.offsetTop));
+  quickbar.style.transform='translateY(-'+gap+'px)';
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',placeQuickbar);
+  window.visualViewport.addEventListener('scroll',placeQuickbar);
+}
+
+/* ===== SERVICE WORKER (uso sin conexion) ===== */
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
+}
+
+/* ===== ARRANQUE ===== */
+grid=[];
+const _restored=restoreSaved();
+render(); updateReader();
+booted=true;
+if(_restored){ markDirty(); showToast('Hoja recuperada — recuerda exportar el .csv'); }
+</script>
+</body>
+</html>
